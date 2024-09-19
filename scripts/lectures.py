@@ -10,20 +10,21 @@ import subprocess
 
 from config import get_week, DATE_FORMAT, CURRENT_COURSE_ROOT
 
-# TODO
+# ALTEREI ARGUMENTO DA FUNÇÃO DE nl_BE.utf8 PARA O ATUAL NA ESPERANÇA DE CORRIGIR A LINGUA PADRÃO PARA PT
 locale.setlocale(locale.LC_TIME, "nl_BE.utf8")
 
-
+#ALTEREI TEX PARA typ
 def number2filename(n):
-    return 'lec_{0:02d}.tex'.format(n)
+    return 'lec_{0:02d}.typ'.format(n)
 
 def filename2number(s):
-    return int(str(s).replace('.tex', '').replace('lec_', ''))
+    return int(str(s).replace('.typ', '').replace('lec_', ''))
 
 class Lecture():
     def __init__(self, file_path, course):
         with file_path.open() as f:
             for line in f:
+                # ALTERAR PARA FORMATAÇÃO DO TYPST
                 lecture_match = re.search(r'lecture\{(.*?)\}\{(.*?)\}\{(.*)\}', line)
                 if lecture_match:
                     break;
@@ -45,9 +46,9 @@ class Lecture():
 
     def edit(self):
         subprocess.Popen([
-            "x-terminal-emulator",
+            "foot",
             "-e", "zsh", "-i", "-c",
-            f"\\vim --servername kulak --remote-silent {str(self.file_path)}"
+            f"\\nvim {str(self.file_path)}"
         ])
 
     def __str__(self):
@@ -58,11 +59,11 @@ class Lectures(list):
     def __init__(self, course):
         self.course = course
         self.root = course.path
-        self.master_file = self.root / 'master.tex'
+        self.master_file = self.root / 'master.typ'
         list.__init__(self, self.read_files())
 
     def read_files(self):
-        files = self.root.glob('lec_*.tex')
+        files = self.root.glob('lec_*.typ')
         return sorted((Lecture(f, self.course) for f in files), key=lambda l: l.number)
 
     def parse_lecture_spec(self, string):
@@ -110,7 +111,7 @@ class Lectures(list):
     def update_lectures_in_master(self, r):
         header, footer = self.get_header_footer(self.master_file)
         body = ''.join(
-            ' ' * 4 + r'\input{' + number2filename(number) + '}\n' for number in r)
+            ' ' * 4 + r'#include ' + number2filename(number) + '\n' for number in r)
         self.master_file.write_text(header + body + footer)
 
     def new_lecture(self):
@@ -125,7 +126,10 @@ class Lectures(list):
         date = today.strftime(DATE_FORMAT)
 
         new_lecture_path.touch()
-        new_lecture_path.write_text(f'\\lecture{{{new_lecture_number}}}{{{date}}}{{}}\n')
+        #PROCURAR ENTENDER COMO FUNCIONA EM RELAÇÃO AO ESQUEMA DO PREÂMBULO E MASTER
+        new_lecture_path.write_text(
+            f'//lecture{{{new_lecture_number}}}{{{date}}}{{}}\n#import "../template.typ": *\n'
+        )
 
         if new_lecture_number == 1:
             self.update_lectures_in_master([1])
@@ -141,9 +145,9 @@ class Lectures(list):
 
     def compile_master(self):
         result = subprocess.run(
-            ['latexmk', '-f', '-interaction=nonstopmode', str(self.master_file)],
+            ['typst', 'compile', '-interaction=nonstopmode', str(self.master_file)],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
             cwd=str(self.root)
         )
-        return result.returncode
+        return result.returncod
